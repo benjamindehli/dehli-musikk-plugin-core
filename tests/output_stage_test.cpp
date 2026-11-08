@@ -376,15 +376,15 @@ void testOutputStage() {
 void testConsole() {
   section("Console");
 
-  constexpr double kTwoPi = 6.283185307179586;
-  constexpr double sr = 48000.0;
-  constexpr int kN = 144000;
+  static constexpr double kTwoPi = 6.283185307179586;
+  static constexpr double sr = 48000.0;
+  static constexpr int kN = 144000;
 
   struct Read {
     double gainDb, thirdDb;
   };
 
-  const auto steady = [sr, kTwoPi, kN](double f, double db) {
+  const auto steady = [](double f, double db) {
     OutputStage stage;
     stage.prepare(sr);
 
@@ -450,7 +450,7 @@ void testConsole() {
   //
   // The reduction it applies to a quiet 1 kHz tone, read as the tone's level
   // in 5 ms windows against where it stood before anything loud arrived.
-  const auto reduction = [sr, kTwoPi](const std::vector<float> &x, int at) {
+  const auto reduction = [](const std::vector<float> &x, int at) {
     const int n = 240;
     std::complex<double> h{};
 
@@ -463,8 +463,8 @@ void testConsole() {
 
   // A -30 dBFS bed of 1 kHz on both sides, with something loud added to one
   // or both from one second in, for `seconds`.
-  const auto withBurst = [sr, kTwoPi](double burstHz, double seconds,
-                                      bool leftOnly, int length) {
+  const auto withBurst = [](double burstHz, double seconds, bool leftOnly,
+                            int length) {
     std::vector<float> l((size_t)length), r((size_t)length);
     const double bed = std::pow(10.0, -30.0 / 20.0);
     const double loud = std::pow(10.0, -1.0 / 20.0);
@@ -502,7 +502,7 @@ void testConsole() {
     // The same burst at 60 Hz and at 400 Hz on both sides, read on the bed.
     // Over 100 ms with a taper, which keeps a loud 60 Hz out of the reading
     // of the bed's 1 kHz, where 5 ms with none lets it straight in.
-    const auto bedAt = [sr, kTwoPi](const std::vector<float> &x, int at) {
+    const auto bedAt = [](const std::vector<float> &x, int at) {
       const int n = 4800;
       std::complex<double> h{};
       double norm = 0.0;
@@ -565,15 +565,15 @@ void testConsole() {
 void testCassette() {
   section("Cassette");
 
-  constexpr double kTwoPi = 6.283185307179586;
-  constexpr double sr = 48000.0;
+  static constexpr double kTwoPi = 6.283185307179586;
+  static constexpr double sr = 48000.0;
 
   // A tone through the recorder, read over its last second with a taper.
   struct Read {
     double gainDb, thirdDb;
   };
 
-  const auto steady = [sr, kTwoPi](double f, double db) {
+  const auto steady = [](double f, double db) {
     constexpr int kN = 96000;
     OutputStage stage;
     stage.prepare(sr);
@@ -686,9 +686,9 @@ void testCassette() {
 
   // ---- the hiss follows the notes -------------------------------------------
   {
-    constexpr int kN = 96000;
+    static constexpr int kN = 96000;
 
-    const auto noiseAbove = [sr, kN, kTwoPi](double toneDb) {
+    const auto noiseAbove = [](double toneDb) {
       OutputStage stage;
       stage.prepare(sr);
 
@@ -786,14 +786,14 @@ void testCassette() {
 void testPrint() {
   section("Print");
 
-  constexpr double kTwoPi = 6.283185307179586;
-  constexpr double sr = 48000.0;
+  static constexpr double kTwoPi = 6.283185307179586;
+  static constexpr double sr = 48000.0;
 
   struct Read {
     double gainDb, thirdDb;
   };
 
-  const auto steady = [sr, kTwoPi](ClipType type, double f, double db) {
+  const auto steady = [](ClipType type, double f, double db) {
     constexpr int kN = 96000;
     OutputStage stage;
     stage.prepare(sr);
@@ -843,7 +843,7 @@ void testPrint() {
   // repeats every 384 samples where hiss does not. At -38 dBFS, quiet enough
   // that the flutter's own difference between cycles stays under the hiss,
   // and loud enough to hold the hiss gate open.
-  const auto hissUnder = [sr, kTwoPi](ClipType type) {
+  const auto hissUnder = [](ClipType type) {
     constexpr int kN = 96000;
     OutputStage stage;
     stage.prepare(sr);

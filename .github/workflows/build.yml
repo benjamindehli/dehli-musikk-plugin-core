@@ -1,0 +1,103 @@
+name: Build and test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Every job reads the repository and checks it. Nothing here writes anything.
+permissions:
+  contents: read
+
+# A new push to a pull request cancels the run for the push before it. Pushes
+# to main are left to finish, so each one keeps a result of its own.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+
+    # Every platform a plugin built on this library ships for, with warnings
+    # as errors, since that is the default when the library is built on its
+    # own.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux
+            os: ubuntu-latest
+          - name: macOS
+            os: macos-latest
+          - name: Windows
+            os: windows-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release --parallel 2
+
+      - name: Test
+        run: ctest --test-dir build --build-config Release --output-on-failure
+
+  sanitizers:
+    name: Sanitizers
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # The tests again, built with the address and undefined behaviour
+    # sanitizers, which stop at a read past an array or a value the standard
+    # does not define, where a plain build would carry on with a plausible
+    # number.
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Configure
+        run: >
+          cmake -B build-san
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          -DDM_PLUGIN_CORE_SANITIZE=ON
+
+      - name: Build
+        run: cmake --build build-san --parallel 2
+
+      - name: Test
+        env:
+          ASAN_OPTIONS: detect_leaks=1:detect_stack_use_after_return=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: ctest --test-dir build-san --output-on-failure
+
+  format:
+    name: Formatting
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    # Prettier for the docs, the readme and the workflows, and clang-format for
+    # the C++. Both versions are pinned, so this job and a developer format
+    # alike.
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci --ignore-scripts
+
+      - run: npm run format:check
+
+      - run: pip install clang-format==23.1.1
+
+      - name: The C++ is formatted
+        run: >
+          find include src tests -name '*.h' -o -name '*.cpp'
+          | xargs clang-format --style=LLVM --dry-run -Werror

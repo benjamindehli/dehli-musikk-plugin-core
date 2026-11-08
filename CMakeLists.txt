@@ -8,6 +8,15 @@ project(dehli_musikk_plugin_core VERSION 0.1.0 LANGUAGES CXX)
 # Plain C++17 with no dependencies, so it builds anywhere and every plugin that
 # uses it compiles the same code. Position independent, since a plugin is a
 # shared library and links this into itself.
+#
+# Standard C++17 rather than the GNU dialect. With the dialect, gcc may fuse a
+# multiply and an add into one instruction where the processor has one, which
+# rounds differently, so the same input could give different samples on
+# different machines.
+#
+# Symbols hidden, as JUCE hides a plugin's own. Two plugins can be loaded into
+# one host with different versions of this library, and on Linux and macOS a
+# visible symbol in one can be bound to the same symbol in the other.
 # ------------------------------------------------------------------------------
 add_library(dm_plugin_core STATIC
     src/dsp/Cassette.cpp
@@ -18,7 +27,11 @@ add_library(dm::plugin_core ALIAS dm_plugin_core)
 
 target_include_directories(dm_plugin_core PUBLIC include)
 target_compile_features(dm_plugin_core PUBLIC cxx_std_17)
-set_target_properties(dm_plugin_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
+set_target_properties(dm_plugin_core PROPERTIES
+    CXX_EXTENSIONS OFF
+    POSITION_INDEPENDENT_CODE ON
+    CXX_VISIBILITY_PRESET hidden
+    VISIBILITY_INLINES_HIDDEN ON)
 
 # ------------------------------------------------------------------------------
 # Warnings
@@ -78,6 +91,7 @@ endif()
 if(PROJECT_IS_TOP_LEVEL AND BUILD_TESTING)
     add_executable(dm_output_stage_test tests/output_stage_test.cpp)
     target_link_libraries(dm_output_stage_test PRIVATE dm::plugin_core)
+    set_target_properties(dm_output_stage_test PROPERTIES CXX_EXTENSIONS OFF)
     dm_plugin_core_set_warnings(dm_output_stage_test)
 
     if(DM_PLUGIN_CORE_SANITIZE AND NOT MSVC)

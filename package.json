@@ -1,0 +1,12 @@
+{
+    "name": "dehli-musikk-plugin-core-tooling",
+    "private": true,
+    "description": "Formatting tools for the docs, the readme and the workflows. The library itself is C++ and CMake and needs none of this.",
+    "scripts": {
+        "format": "prettier --write .",
+        "format:check": "prettier --check ."
+    },
+    "devDependencies": {
+        "prettier": "3.9.10"
+    }
+}

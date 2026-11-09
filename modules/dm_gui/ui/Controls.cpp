@@ -372,6 +372,11 @@ void SegmentDisplay::showSharpSign(bool shouldShow) {
   repaint();
 }
 
+void SegmentDisplay::setLampColour(juce::Colour colour) {
+  lamp = colour;
+  repaint();
+}
+
 void SegmentDisplay::mouseUp(const juce::MouseEvent &e) {
   if (onClick && contains(e.getPosition()))
     onClick();
@@ -570,7 +575,8 @@ SegmentDisplay::createAccessibilityHandler() {
 
 void SegmentDisplay::paint(juce::Graphics &g) {
   LookKey key;
-  key.add(reading).add(active).add(hovered).add(sharpSign).add(unitText);
+  key.add(reading).add(active).add(hovered).add(sharpSign).add(unitText).add(
+      lamp);
 
   // How many cells the reading fitted is worked out while drawing, so it is
   // kept beside each picture for cellsDrawn to go on reporting.
@@ -591,16 +597,16 @@ void SegmentDisplay::paintReading(juce::Graphics &g) {
 
   // Unlit bars are fainter where there are fourteen to a cell.
   const auto rest = bars == Bars::Fourteen ? 0.55f : 1.0f;
-  const auto off = colours::accent.withAlpha((hovered ? 0.20f : 0.12f) * rest);
+  const auto off = lamp.withAlpha((hovered ? 0.20f : 0.12f) * rest);
 
   // Inactive shows only unlit bars. A segment is lit or it is not.
-  const auto lit = active ? colours::accent.withAlpha(0.95f) : off;
+  const auto lit = active ? lamp.withAlpha(0.95f) : off;
 
   // Set into the panel, using the pixel of margin around the ground.
   paintRecess(g, area, 2.5f);
 
   // The lit screen ground.
-  paintDisplayGround(g, area, 2.5f, hovered);
+  paintDisplayGround(g, area, 2.5f, hovered, lamp);
 
   if (hovered) {
     g.setColour(colours::outline);
@@ -994,23 +1000,35 @@ float toNormalised(float level) {
                           -kMeterFloorDb);
 }
 
-/// The colour of the lamp standing at this fraction of full scale. Fixed per
-/// lamp, whatever the level.
-juce::Colour lampColour(float t) {
-  if (t < 0.80f)
-    return colours::accent;
-
-  if (t < 0.94f)
-    return colours::accent.interpolatedWith(colours::soloOn,
-                                            (t - 0.80f) / 0.14f);
-
-  return colours::soloOn.interpolatedWith(colours::muteOn, (t - 0.94f) / 0.06f);
-}
 } // namespace
 
+juce::Colour StereoOutputMeter::lampColourAt(float t) const {
+  // Fixed per lamp, whatever the level.
+  if (t < 0.80f)
+    return lowColour;
+
+  if (t < 0.94f)
+    return lowColour.interpolatedWith(highColour, (t - 0.80f) / 0.14f);
+
+  return highColour.interpolatedWith(topColour, (t - 0.94f) / 0.06f);
+}
+
+void StereoOutputMeter::setVertical(bool shouldStand) {
+  vertical = shouldStand;
+  repaint();
+}
+
+void StereoOutputMeter::setLampColours(juce::Colour low, juce::Colour high,
+                                       juce::Colour top) {
+  lowColour = low;
+  highColour = high;
+  topColour = top;
+  repaint();
+}
+
 int StereoOutputMeter::segments() const {
-  // A lamp every eight pixels or so, within reason.
-  return juce::jlimit(12, 48, getWidth() / 8);
+  // A lamp every eight pixels or so along the bars, within reason.
+  return juce::jlimit(12, 48, (vertical ? getHeight() : getWidth()) / 8);
 }
 
 bool StereoOutputMeter::Bar::advance(float level, int count) {
@@ -1068,21 +1086,31 @@ void StereoOutputMeter::push(float l, float r) {
 
 void StereoOutputMeter::paintBar(juce::Graphics &g, juce::Rectangle<float> r,
                                  const Bar &bar, int count) const {
-  const auto step = r.getWidth() / (float)count;
+  const auto length = vertical ? r.getHeight() : r.getWidth();
+  const auto step = length / (float)count;
   const auto gap = juce::jlimit(1.0f, 3.0f, step * 0.18f);
 
   for (int i = 0; i < count; ++i) {
-    const auto lamp = juce::Rectangle<float>(r.getX() + (float)i * step,
-                                             r.getY(), step, r.getHeight())
-                          .reduced(gap * 0.5f, 1.0f);
+    // Standing, the first lamp is at the bottom.
+    const auto lamp =
+        vertical ? juce::Rectangle<float>(r.getX(),
+                                          r.getBottom() - (float)(i + 1) * step,
+                                          r.getWidth(), step)
+                       .reduced(1.0f, gap * 0.5f)
+                 : juce::Rectangle<float>(r.getX() + (float)i * step, r.getY(),
+                                          step, r.getHeight())
+                       .reduced(gap * 0.5f, 1.0f);
 
-    const auto colour = lampColour(((float)i + 0.5f) / (float)count);
+    const auto colour = lampColourAt(((float)i + 0.5f) / (float)count);
 
     // The peak stays alight above the bar it came from.
     const bool on = i < bar.lit || i == bar.peakLamp;
 
     g.setColour(colour.withAlpha(on ? 0.92f : 0.13f));
-    g.fillRoundedRectangle(lamp, juce::jmin(1.5f, lamp.getWidth() * 0.4f));
+    // Rounded by the lamp's length along the bar, which is what the corner
+    // has to fit.
+    const auto along = vertical ? lamp.getHeight() : lamp.getWidth();
+    g.fillRoundedRectangle(lamp, juce::jmin(1.5f, along * 0.4f));
   }
 }
 
@@ -1090,13 +1118,20 @@ void StereoOutputMeter::paint(juce::Graphics &g) {
   auto area = getLocalBounds().toFloat();
 
   // Scale marks at the decibel values worth aiming at.
-  const auto scale = area.removeFromBottom((float)kScaleHeight);
+  const auto scale = vertical ? area.removeFromLeft((float)kScaleHeight)
+                              : area.removeFromBottom((float)kScaleHeight);
   for (const float db : {-48.0f, -36.0f, -24.0f, -12.0f, -6.0f, 0.0f}) {
     const auto t = (db - kMeterFloorDb) / -kMeterFloorDb;
-    const auto x = scale.getX() + t * (scale.getWidth() - 1.5f);
 
     g.setColour(colours::textDim.withAlpha(db >= -6.0f ? 0.55f : 0.30f));
-    g.fillRect(x, scale.getY(), 1.0f, 3.0f);
+
+    if (vertical)
+      g.fillRect(scale.getX(),
+                 scale.getBottom() - 1.0f - t * (scale.getHeight() - 1.5f),
+                 3.0f, 1.0f);
+    else
+      g.fillRect(scale.getX() + t * (scale.getWidth() - 1.5f), scale.getY(),
+                 1.0f, 3.0f);
   }
 
   // Both bars in one recess, as one two-line display, a pixel in for its lip.
@@ -1110,6 +1145,14 @@ void StereoOutputMeter::paint(juce::Graphics &g) {
   // The bars meet, and each lamp's own pixel above and below leaves the same
   // dark line between them as between the lamps along a bar.
   const auto count = segments();
+
+  if (vertical) {
+    const auto barW = area.getWidth() * 0.5f;
+    paintBar(g, area.removeFromLeft(barW), left, count);
+    paintBar(g, area, right, count);
+    return;
+  }
+
   const auto barH = area.getHeight() * 0.5f;
 
   paintBar(g, area.removeFromTop(barH), left, count);

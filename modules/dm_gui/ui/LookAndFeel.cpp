@@ -176,12 +176,11 @@ constexpr float kDisplayWashHover = 0.10f;
 } // namespace
 
 void paintDisplayGround(juce::Graphics &g, juce::Rectangle<float> area,
-                        float corner, bool hovered) {
+                        float corner, bool hovered, juce::Colour tint) {
   g.setColour(colours::groove);
   g.fillRoundedRectangle(area, corner);
 
-  g.setColour(
-      colours::accent.withAlpha(hovered ? kDisplayWashHover : kDisplayWash));
+  g.setColour(tint.withAlpha(hovered ? kDisplayWashHover : kDisplayWash));
   g.fillRoundedRectangle(area, corner);
 }
 
@@ -419,7 +418,13 @@ void LookAndFeel::drawRotarySlider(juce::Graphics &g, int x, int y, int width,
                        (rotaryEndAngle - rotaryStartAngle)
              : angle;
 
-  const int ticks = juce::jlimit(9, 25, juce::roundToInt(radius * 1.15f));
+  // A knob with no ring, such as a plugin's big level knobs, is all cap and
+  // shows where it stands by its stripe alone.
+  const bool ringless =
+      (bool)slider.getProperties().getWithDefault("ringless", false);
+
+  const int ticks =
+      ringless ? 0 : juce::jlimit(9, 25, juce::roundToInt(radius * 1.15f));
   const auto lo = juce::jmin(anchor, ringAngle);
   const auto hi = juce::jmax(anchor, ringAngle);
 
@@ -452,7 +457,9 @@ void LookAndFeel::drawRotarySlider(juce::Graphics &g, int x, int y, int width,
   // ---- the cap --------------------------------------------------------------
   // A flat dark face with a fluted collar round it and one wide stripe from
   // the middle out across the collar.
-  const auto bodyR = radius * 0.68f;
+  // With no ring the cap takes the room the ring had, less a margin for its
+  // shadow.
+  const auto bodyR = radius * (ringless ? 0.86f : 0.68f);
   const juce::Rectangle<float> body(centre.x - bodyR, centre.y - bodyR,
                                     bodyR * 2.0f, bodyR * 2.0f);
 

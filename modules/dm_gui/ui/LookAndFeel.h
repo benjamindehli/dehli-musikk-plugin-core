@@ -161,7 +161,8 @@ void paintColumnHighlight(juce::Graphics &, juce::Rectangle<int> strip);
 /// The ground a lit readout sits on: the tuning digits and the shape glyph.
 /// A faint accent wash, lifted further when @p hovered.
 void paintDisplayGround(juce::Graphics &, juce::Rectangle<float> area,
-                        float corner, bool hovered);
+                        float corner, bool hovered,
+                        juce::Colour tint = colours::accent);
 
 /// The pocket milled into the panel behind a group of controls on the top bar
 /// and the bars under it.

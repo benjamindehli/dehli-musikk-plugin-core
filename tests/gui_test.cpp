@@ -2,6 +2,7 @@
 // something, the paint cache keeps two looks, and the grain is released with
 // the last look and feel.
 
+#include <cmath>
 #include <cstdio>
 #include <functional>
 #include <memory>
@@ -149,6 +150,87 @@ void testGrainGoesWithTheLookAndFeel() {
         "it is built again once the last one has gone");
 }
 
+/// The colour of one pixel of a component drawn on its own.
+juce::Colour pixelAt(juce::Component &c, int x, int y) {
+  juce::Image image(juce::Image::ARGB, c.getWidth(), c.getHeight(), true);
+  {
+    juce::Graphics g(image);
+    c.paintEntireComponent(g, false);
+  }
+  return image.getPixelAt(x, y);
+}
+
+void testLooksAPluginCanChange() {
+  section("Looks a plugin can change");
+
+  dm::ui::LookAndFeel lnf;
+  const juce::Colour red{0xffff3020};
+
+  dm::ui::SegmentDisplay display("");
+  display.setLookAndFeel(&lnf);
+  display.setBounds(0, 0, 60, 24);
+  display.setReading("888", true);
+  const auto cyan = pixelAt(display, 30, 12);
+  display.setLampColour(red);
+  check(display.getLampColour() == red, "a readout keeps its lamp colour");
+  const auto lit = pixelAt(display, 30, 12);
+  check(lit.getRed() > lit.getBlue() && cyan.getBlue() > cyan.getRed(),
+        "and lights in it rather than the accent");
+  display.setLookAndFeel(nullptr);
+
+  // A full knob in green, looked at just inside its edge where the ring
+  // starts. Lit green with the ring, not green without it.
+  const auto ringAt = [&](bool ringless) {
+    dm::ui::Slider knob;
+    knob.setLookAndFeel(&lnf);
+    knob.setSliderStyle(juce::Slider::RotaryVerticalDrag);
+    knob.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+    knob.setColour(juce::Slider::rotarySliderFillColourId, juce::Colours::lime);
+    knob.getProperties().set("ringless", ringless);
+    knob.setValue(knob.getMaximum());
+    knob.setBounds(0, 0, 80, 80);
+
+    const auto angle = knob.getRotaryParameters().startAngleRadians;
+    const auto r = 39.0f * 0.94f;
+    const auto pixel =
+        pixelAt(knob, juce::roundToInt(40.0f + r * std::sin(angle)),
+                juce::roundToInt(40.0f - r * std::cos(angle)));
+    knob.setLookAndFeel(nullptr);
+    return pixel;
+  };
+
+  const auto ringed = ringAt(false);
+  const auto bare = ringAt(true);
+  check(ringed.getGreen() > 150 && ringed.getRed() < 100,
+        "a knob's ring lights in its colour");
+  check(bare.getGreen() < 100, "a ringless knob has no ring");
+
+  dm::ui::StereoOutputMeter meter;
+  check(meter.lampColourAt(0.5f) == dm::ui::colours::accent &&
+            meter.lampColourAt(1.0f) == dm::ui::colours::muteOn,
+        "the stereo meter keeps its colours unless told");
+
+  meter.setLampColours(red, juce::Colours::yellow, juce::Colours::white);
+  check(meter.lampColourAt(0.5f) == red &&
+            meter.lampColourAt(1.0f) == juce::Colours::white,
+        "and takes the ones it is given");
+
+  meter.setVertical(true);
+  meter.setBounds(0, 0, 20, 160);
+  check(meter.barBounds() == juce::Rectangle<int>(4, 0, 16, 160),
+        "standing, its scale runs down the left");
+
+  // Half of full scale lights most of the way up, not to the top.
+  for (int i = 0; i < 4; ++i)
+    meter.push(0.5f, 0.5f);
+
+  const auto bottom = pixelAt(meter, 8, 154);
+  const auto top = pixelAt(meter, 8, 5);
+  check(bottom.getRed() > 200 && bottom.getGreen() < 120,
+        "it lights from the bottom");
+  check(top.getBrightness() < 0.4f, "and not to the top");
+}
+
 void testHelpers() {
   section("Helpers");
 
@@ -167,6 +249,7 @@ int main() {
   testControlsPaint();
   testPaintCache();
   testGrainGoesWithTheLookAndFeel();
+  testLooksAPluginCanChange();
   testHelpers();
 
   std::printf("\n%d checks, %d failures\n", checks, failures);

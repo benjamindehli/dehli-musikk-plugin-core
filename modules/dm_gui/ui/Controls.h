@@ -157,6 +157,11 @@ public:
   /// reading has a # in it.
   void showSharpSign(bool shouldShow);
 
+  /// What the bars light in, and what tints the glass. Accent unless told
+  /// otherwise.
+  void setLampColour(juce::Colour);
+  juce::Colour getLampColour() const noexcept { return lamp; }
+
   /// How wide this display has to be at @p height for every cell to stand at
   /// full width, with room for the sharp sign and the unit if it has them.
   int naturalWidth(int height) const;
@@ -222,6 +227,7 @@ private:
   std::array<int, 2> drawnFor{};
 
   juce::String reading, unitText;
+  juce::Colour lamp = colours::accent;
   bool active = false;
   bool hovered = false;
   bool sharpSign = false;
@@ -290,20 +296,34 @@ private:
   int step = 0;
 };
 
-/// The stereo output meter: two horizontal segmented bars with a peak hold.
-/// It only repaints when a lamp changes.
+/// The stereo output meter: two segmented bars with a peak hold, lying down
+/// unless stood up. It only repaints when a lamp changes.
 class StereoOutputMeter : public juce::Component {
 public:
   StereoOutputMeter() { setInterceptsMouseClicks(false, false); }
 
-  /// The strip along the bottom that carries the decibel marks rather than
-  /// any lamps.
+  /// The strip along the bottom, or down the left side when standing, that
+  /// carries the decibel marks rather than any lamps.
   static constexpr int kScaleHeight = 4;
 
-  /// Where the two bars are, above the scale. A fader can lie over this.
+  /// Where the two bars are, beside the scale. A fader can lie over this.
   juce::Rectangle<int> barBounds() const {
-    return getLocalBounds().withTrimmedBottom(kScaleHeight);
+    return vertical ? getLocalBounds().withTrimmedLeft(kScaleHeight)
+                    : getLocalBounds().withTrimmedBottom(kScaleHeight);
   }
+
+  /// Stands the meter up: the bars side by side, left then right, rising from
+  /// the bottom.
+  void setVertical(bool shouldStand);
+  bool isVertical() const noexcept { return vertical; }
+
+  /// The lamps' colours: @p low up to -4 dB or so, turning to @p high, then to
+  /// @p top in the last lamps before full scale. The accent, the solo yellow
+  /// and the mute red unless told otherwise.
+  void setLampColours(juce::Colour low, juce::Colour high, juce::Colour top);
+
+  /// The colour of the lamp standing at this fraction of full scale.
+  juce::Colour lampColourAt(float fraction) const;
 
   /// @param l,r  linear peaks from the audio thread.
   void push(float l, float r);
@@ -332,6 +352,11 @@ private:
                 int count) const;
 
   Bar left, right;
+
+  bool vertical = false;
+  juce::Colour lowColour = colours::accent;
+  juce::Colour highColour = colours::soloOn;
+  juce::Colour topColour = colours::muteOn;
 };
 
 } // namespace dm::ui

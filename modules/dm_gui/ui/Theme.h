@@ -45,7 +45,7 @@ inline const juce::Colour panel{0xff14181d};
 inline const juce::Colour panelAlt{0xff15191e};
 
 /// What every channel stands on.
-inline const juce::Colour channel{0xff0f1115};
+inline const juce::Colour channel{0xff0d0e12};
 inline const juce::Colour groove{0xff090b0e};
 inline const juce::Colour outline{0xff222830};
 inline const juce::Colour text{0xffd9dfe7};

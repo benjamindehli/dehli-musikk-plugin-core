@@ -434,7 +434,7 @@ void LookAndFeel::drawRotarySlider(juce::Graphics &g, int x, int y, int width,
   // has no colour of its own yet, so its ring is the plain dim grey a silent
   // channel's is.
   const auto unlit =
-      (blank ? colours::textDim : fill).withAlpha(0.2f + 0.3f * glow);
+      (blank ? colours::textDim : fill).withAlpha(0.1f + 0.3f * glow);
 
   for (int i = 0; i < ticks; ++i) {
     const auto t = (float)i / (float)(ticks - 1);
@@ -482,8 +482,8 @@ void LookAndFeel::drawRotarySlider(juce::Graphics &g, int x, int y, int width,
 
   // The collar wall's tone, with only a slight turn across it, since it is a
   // wall and not a bevel.
-  const auto wallLit = colours::panelAlt.brighter(0.46f);
-  const auto wallShaded = colours::panelAlt.brighter(0.30f);
+  const auto wallLit = colours::panelAlt.brighter(0.368f);
+  const auto wallShaded = colours::panelAlt.brighter(0.24f);
 
   // Eight whatever the knob's size. More alias into a shimmer as they turn
   // on a small knob.
@@ -522,8 +522,8 @@ void LookAndFeel::drawRotarySlider(juce::Graphics &g, int x, int y, int width,
   // towards the lower right. On a dark knob this is what shows the notches,
   // so it fades to a little rather than to nothing.
   g.setGradientFill(juce::ColourGradient(
-      juce::Colours::white.withAlpha(0.16f * dim), centre.x - rimOut * 0.80f,
-      centre.y - rimOut * 0.80f, juce::Colours::white.withAlpha(0.04f * dim),
+      juce::Colours::white.withAlpha(0.136f * dim), centre.x - rimOut * 0.80f,
+      centre.y - rimOut * 0.80f, juce::Colours::white.withAlpha(0.034f * dim),
       centre.x + rimOut * 0.80f, centre.y + rimOut * 0.80f, false));
   g.strokePath(collar, juce::PathStrokeType(juce::jmax(0.7f, radius * 0.045f)));
 
